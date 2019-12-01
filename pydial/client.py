@@ -39,8 +39,7 @@ DeviceStatus = namedtuple("DeviceStatus",
                            "manufacturer", "api_version"])
 
 AppStatus = namedtuple("AppStatus", ["app_id", "description", "state",
-                                     "options", "service_url",
-                                     "service_protocols"])
+                                     "options", "link"])
 
 # Device status XML constants
 XML_NS_UPNP_DEVICE = "{urn:schemas-upnp-org:device-1-0}"
@@ -73,16 +72,20 @@ class DialClient(requests.Session):
                raise AttributeError('Uninitialized application URL.')
 
           url = _BASE_URL.format(self.app_host, self.app_port, self.app_path) \
-                    + appid
-          req = requests.Request('GET', url).prepare()
-          response = self.send(req)
+                    + str(appid)
+          response = requests.get(url)
 
+          if response.status_code == 404:
+               print (response)
+               return None
           # FIXME: Raise an exception here?
           # TODO: Look for 404 in case app is not present
           if response.status_code == 204:
+               print (response)
                return None
 
           status_el = ET.fromstring(response.text.encode("UTF-8"))
+          
           options = status_el.find(XML_NS_DIAL + "options").attrib
 
           app_id = _read_xml_element(status_el, XML_NS_DIAL,
@@ -91,22 +94,24 @@ class DialClient(requests.Session):
           state = _read_xml_element(status_el, XML_NS_DIAL,
                                   "state", "unknown")
 
-          service_el = status_el.find(XML_NS_CAST + "servicedata")
+          link = status_el.find(XML_NS_DIAL + "link").attrib
 
-          if service_el is not None:
-               service_url = _read_xml_element(service_el, XML_NS_CAST,
-                                            "connectionSvcURL", None)
+          # service_el = status_el.find(XML_NS_CAST + "servicedata")
 
-               protocols_el = service_el.find(XML_NS_CAST + "protocols")
-
-               if protocols_el is not None:
-                    protocols = [el.text for el in protocols_el]
-               else:
-                    protocols = []
-
-          else:
-               service_url = None
-               protocols = []
+          # if service_el is not None:
+          #      service_url = _read_xml_element(service_el, XML_NS_CAST,
+          #                                   "connectionSvcURL", None)
+          #
+          #      protocols_el = service_el.find(XML_NS_CAST + "protocols")
+          #
+          #      if protocols_el is not None:
+          #           protocols = [el.text for el in protocols_el]
+          #      else:
+          #           protocols = []
+          #
+          # else:
+          #      service_url = None
+          #      protocols = []
 
           activity_el = status_el.find(XML_NS_CAST + "activity-status")
           if activity_el is not None:
@@ -115,35 +120,33 @@ class DialClient(requests.Session):
           else:
                description = app_id
 
-          return AppStatus(app_id, description, state, options, service_url, protocols)
+          return AppStatus(app_id, description, state, options, link)
 
 
-     def launch_app(self, appid, args=None):
+     def launch_app(self, appid):
           if not self.app_path:
                raise AttributeError('Uninitialized application URL.')
 
           url = _BASE_URL.format(self.app_host, self.app_port, self.app_path) \
                     + appid
-          header = ''
-          if not args:
-               header = 'Content-Length: 0'
-          req = requests.Request('POST', url, data=args, headers=header)
-          prepped = req.prepare()
-          response = self.send(prepped)
-          print(response)
+          print(url)
+          req = requests.post(url)
+          print(req)
 
      def quit_app(self, app_id=None):
           """ Quits specified application if it is running.
           If no app_id specified will quit current running app. """
 
-          if not app_id:
+          if app_id:
                status = self.get_app_status(app_id)
+               print (status)
 
           if status:
                app_id = status.app_id
 
           if app_id:
-               self.delete(self._craft_app_url(app_id))
+               req = self.delete(self._craft_app_url(app_id))
+               print (req)
 
      def get_device_description(self):
           """ Returns the device status as a named tuple. Initializes the
@@ -182,7 +185,7 @@ class DialClient(requests.Session):
                             api_version)
 
           except (requests.exceptions.RequestException, ET.ParseError):
-               return None 
+               return None
 
 
 def discover(max_devices=None, timeout=DISCOVER_TIMEOUT, verbose=False):
