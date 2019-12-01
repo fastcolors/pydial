@@ -246,7 +246,6 @@ def discover(max_devices=None, timeout=DISCOVER_TIMEOUT, verbose=False):
 
      return devices
 
-
 def _read_xml_element(element, xml_ns, tag_name, default=""):
      """ Helper method to read text from an element. """
      try:
