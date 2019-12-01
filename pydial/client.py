@@ -58,14 +58,15 @@ class DialClient(requests.Session):
           self.app_host = None
           self.app_port = None
 
-     def _craft_app_url(self, app_id=None):
-          """ Helper method to create a ChromeCast url given
-          a host and an optional app_id. """
-          url = _BASE_URL.format(self.app_host, self.app_port, self.app_path)
-          if app_id is not None:
-               return url + app_id
-          else:
-               return url
+     # def _craft_app_url(self, app_id=None):
+     #      """ Helper method to create a ChromeCast url given
+     #      a host and an optional app_id. """
+     #      url = _BASE_URL.format(self.app_host, self.app_port, self.app_path)
+     #      if app_id is not None:
+     #           return url + app_id
+     #      else:
+     #           return url
+
      def get_app_status(self, appid=None):
           """Returns the status of the requested app as a named tuple."""
           if not self.app_path:
@@ -85,7 +86,7 @@ class DialClient(requests.Session):
                return None
 
           status_el = ET.fromstring(response.text.encode("UTF-8"))
-          
+
           options = status_el.find(XML_NS_DIAL + "options").attrib
 
           app_id = _read_xml_element(status_el, XML_NS_DIAL,
@@ -217,7 +218,7 @@ def discover(max_devices=None, timeout=DISCOVER_TIMEOUT, verbose=False):
                     response = str(sock.recv(1024), 'utf-8')
                     if verbose:
                          print(response)
-                    found_url = found_st = None
+                    found_url = found_st = found_wol = None
                     headers = response.split("\r\n\r\n", 1)[0]
 
                     for header in headers.split("\r\n"):
@@ -233,8 +234,12 @@ def discover(max_devices=None, timeout=DISCOVER_TIMEOUT, verbose=False):
                          elif key == "ST":
                               found_st = value
 
+                         elif key == "WAKEUP":
+                              found_wol = value
+
                     if found_st == SSDP_ST and found_url:
                          devices.append(found_url)
+                         devices.append(found_wol)
 
                          if max_devices and len(devices) == max_devices:
                               return devices
